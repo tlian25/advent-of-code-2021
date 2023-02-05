@@ -2,6 +2,7 @@
 # https://adventofcode.com/2021/day/18
 
 from collections import deque
+from itertools import permutations
 from util.input_util import read_input_file
 
 
@@ -49,7 +50,6 @@ def explode(eq):
     modified = False
     level = 0
     stack = deque()
-    right = 0
     while eq:
         x = eq.popleft()
         if x == '[':
@@ -62,10 +62,17 @@ def explode(eq):
         else:
             # Explode - should be two numbers
             # Pop entire [x, y] off and replace with 0
-            if level >= 5 and not modified:
+            if level >= 5:
                 modified = True
                 left = x
+                # Check if there is a deeper nest
+                if eq[0] == '[':
+                    stack.append(x)
+                    continue
+                
+                # No deeper nest
                 right = eq.popleft()
+                
                 # add left to previous number in stack
                 stack.pop()
                 i = len(stack)-1
@@ -76,70 +83,99 @@ def explode(eq):
                     i -= 1
                 
                 close_bracket = eq.popleft()
-                level -= 1
                 stack.append(0)
+                # add right to next number in eq
+                i = 0
+                while i < len(eq):
+                    if isinstance(eq[i], int):
+                        eq[i] += right
+                        break
+                    i += 1
                 
-            else:
-                print(x, right)
-                printeq(stack)
-                stack.append(x+right)
-                right = 0
-                
-
+                return stack + eq, modified
         
+            else:
+                stack.append(x)
+                
     return stack, modified
 
 
 def split(eq):
     modified = False
     stack = deque()
+
     while eq:
         x = eq.popleft()
         if isinstance(x, int) and x >= 10:
             modified = True
-            stack += ['[', x // 2, x - x // 2, ']']
+            stack += deque(['[', x//2, x-x//2, ']']) + eq
+            return stack, modified
         else:
             stack.append(x)
-            
+
     return stack, modified
-                
-                    
-def process(l):
-    pass
+
+
+def magnitude(eq):
+    # 3 times left + 2 times right
+    stack = deque()
+    while eq:
+        x = eq.popleft()
+        if x != ']':
+            stack.append(x)
+        # Unwind
+        elif x == ']':
+            right = stack.pop()
+            left = stack.pop()
+            open_bracket = stack.pop()
+            magn = left * 3 + right * 2
+            stack.append(magn)
+            
+    return stack[0]
+            
+
+def add(eq1, eq2):
+    eq = eq1 + eq2
+    eq.appendleft('[')
+    eq.append(']')
+    
+    # Operate until steady state
+    modified = True
+    while modified:
+
+        # Explode
+        eq, m1 = explode(eq)
+        while m1:
+            eq, m1 = explode(eq)
+        
+        # Split
+        eq, m2 = split(eq)
+
+        modified = m1 or m2
+        
+    return eq
 
 
 def solution1():
     eqs = parse_lines()
     
     eq = eqs[0]
-    for i in range(1, 2):
-        
-        eq += eqs[i]
-        eq.appendleft('[')
-        eq.append(']')
-        
-        printeq(eq)
-        
-        # Operate until steady state
-        modified = True
-        while modified:
-            eq, m1 = explode(eq)
-            printeq(eq)
+    for i in range(1, len(eqs)):
+        eq = add(eq, eqs[i])
+    
+    return magnitude(eq)
 
-            eq, m2 = split(eq)
-            modified = m1 or m2
-    
-            printeq(eq)
-        
-    
-            
-        
-    
-    
-    
-    
+
 def solution2():
-    pass
+    eqs = parse_lines()
+    
+    maxmagn = 0
+    for eq1, eq2 in permutations(eqs, 2):
+        eq = add(eq1, eq2)
+        magn = magnitude(eq)
+        maxmagn = max(maxmagn, magn)
+        
+    return maxmagn
     
     
     
