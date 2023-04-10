@@ -10,16 +10,6 @@ def parse_lines():
     lines = read_input_file(16)
     return lines[0]
 
-    
-# First three bits encode packet version
-# Next three bits encode packet type ID
-
-# ID == 4 -> represent a literal value
-# ID != 4 -> represent an operation
-
-# Operator packet contains one or more packets
-# Length Type ID -> 0 = 15 bits, 1 = 11 bits
-
 hex_to_bin_map = {
     "\n" : "",
     "0" : "0000",
@@ -40,6 +30,14 @@ hex_to_bin_map = {
     "F" : "1111"
     }
 
+def hex2dec(line):
+    return ''.join([hex_to_bin_map[h] for h in line])
+
+def parse_lines():
+    lines = read_input_file(16)
+    return hex2dec(lines[0])
+
+
 op_map = {
     0 : sum,
     1 : lambda x : reduce(operator.mul, x),
@@ -50,94 +48,108 @@ op_map = {
     7 : lambda x : 1 if x[0] == x[1] else 0
     }
 
-def evaluate_literal(p, i):
-    ans_str = ""
-    while p[i] == '1':
-        j = i + 5
-        ans_str += p[i + 1 : j]
-        i = j
-    j = i + 5
-    ans_str += p[i + 1 : j]
-    return int(ans_str, 2), j
+# First three bits encode packet version
+# Next three bits encode packet type ID
+
+# Type ID 4 -> literal value, single binary number
+# Padded with leading zeros until length is a multiple of four bits
+# Each group prefixed by a 1-bit except last group prefixed by 0-bit
+
+# Type ID !4 -> operator that performs some calculation 
+# Length type ID = 0 -> next 15 bits are a number that represents total length in bits of sub-packets
+# Length type ID = 1 -> next 11 bits are a number that represent number of sub-packets
+
+VERSION_TOTAL = 0
+RESULT = []
+DIGIT = 'DIGIT'
+OPER = 'OPER'
+
+
+
+def parse_packet(packet) -> list:
+    
+    global VERSION_TOTAL
+    global RESULT
+    
+    if packet is None or len(packet) == 0:
+        return None
+    
+    # Header
+    version = int(packet[:3], 2)
+    typeID = int(packet[3:6], 2)
+    print(version, typeID, len(packet))
+    VERSION_TOTAL += version
+    
+    if typeID == 4: # literal
+        packet = parse_literal(packet[6:])
+    else: # operator
+        RESULT.append((OPER, typeID))
+        packet = parse_operator(packet[6:])
+        
+    return packet
+        
     
 
-def evaluate_packet(p):
-    ver = 0
-    if len(p) < 11:
-        # Simple (but not thorough) validation check.
-        return 0
-    t = int(p[3 : 6], 2)
-    i = 0
-    stack = []
-    if t == 4:
-        # Top-level packet represents a literal value. Easy peasy.
-        return evaluate_literal(p, 7)
-    else:
-        # Top-level packet represents an operator.
-        if p[6] == '0':
-            # The next 15 digits give the total length in bits of the
-            # sub-packets contained in this operator packet.
-            i = 22
-            stack.append([t, i + int(p[7 : 22], 2), -1, []])
-        else:
-            # The next 11 bits are a number that represents the number of
-            # sub-packets immediately contained in this operator packet.
-            i = 18
-            stack.append([t, -1, int(p[7 : 18], 2), []])
 
-    a = None
-    while stack:
-        s = stack[-1]
-        if a is not None:
-            s[3].append(a)
-        if i == s[1] or s[2] == 0:
-            a = op_map[s[0]](s[3])
-            stack.pop()
-            continue
-        if s[2] != -1:
-            s[2] -= 1
-        # Right. Time to process a new packet.
-        j = i
-        i += 3
-        t = int(p[i : i + 3], 2)
-        i += 3
-        if t == 4:
-            # The packet that we're examining represents a literal value.
-            ver += int(p[:3], 2)
-            a, i = evaluate_literal(p, i)
-        else:
-            # The packet that we're examining represents an operator.
-            ver += int(p[:3], 2)
-            a = None
-            if p[i] == '0':
-                # The next 15 digits give the total length in bits of the
-                # sub-packets contained in this operator packet.
-                j = i + 1
-                i += 16
-                stack.append([t, i + int(p[j : i], 2), -1, []])
-            else:
-                # The next 11 bits are a number that represents the number of
-                # sub-packets immediately contained in this operator packet.
-                j = i + 1
-                i += 12
-                stack.append([t, -1, int(p[j : i], 2), []])
+def parse_literal(packet) -> list:
     
-    return a, ver
+    global RESULT
+
+    digit = ""
+    while len(packet) > 4:
+        lead = packet[0]
+        print("Digit", lead, packet[1:5])
+        digit += packet[1:5]
+        packet = packet[5:]
+        
+        if lead == '0': # break
+            digit = int(digit, 2)
+            print("Literal: ", digit)
+            RESULT.append((DIGIT, digit))
+            return packet
+         
 
 
+
+def parse_operator(packet) -> list:
+    length_typeID = packet[0]
+    if length_typeID == '0':
+        subpacket_length = int(packet[1:16], 2)
+        print("Subpacket length: ", subpacket_length)
+        subpacket = packet[16:16+subpacket_length]
+        while subpacket:
+            subpacket = parse_packet(subpacket)
+
+        return packet[16+subpacket_length:]
+        
+        
+    elif length_typeID == '1':
+        subpacket_count = int(packet[1:12], 2)
+        print("Subpacket count: ", subpacket_count)
+        packet = packet[12:]
+        for i in range(subpacket_count):
+            packet = parse_packet(packet)
+            
+        return packet
+        
+        
+        
     
 
-    
+
+
 
 
 def solution1():
-    r = parse_lines()
-    packet = ""
-    for i in range(len(r)):
-        packet += hex_to_bin_map[r[i]]
+    packet = parse_lines()
+    
+    while packet:
+        packet = parse_packet(packet)
+    
+    print(VERSION_TOTAL)
+    print(RESULT)
+    
 
-    a, ver = evaluate_packet(packet)
-    print(ver)
 
     
     
