@@ -74,7 +74,8 @@ def run(grid, endstate):
     print()
     #for s in STATE:
     #    print(s, STATE[s])
-    return STATE[endstate] + 2 # Off by 2 for some reason
+    return STATE[endstate]
+
 
 
 def drop_in_slot(ngrid, nscore, slot, c):
@@ -99,20 +100,25 @@ def process_fixed(grid):
 def process_top_row(h, grid, score):
     for c in range(COLS):
         v = grid[0][c]
-        if v not in (SPACE, WALL):
+        if v != SPACE:
             # Move left and right as far as possible and see if can drop down into a col
             # left
             l, r = c-1, c+1
             while l >= 0:
-                if l == SLOT_FOR_LETTER[v] and grid[1][l] == SPACE and grid[2][l] in (v, SPACE):
+                if grid[0][l] != SPACE:
+                    break
+                elif l == SLOT_FOR_LETTER[v] and grid[1][l] == SPACE and all([grid[x][l] in (v, SPACE) for x in range(2, len(grid))]):
                     ngrid = deepcopy(grid)
                     nscore = abs(c-l) * ENERGY[v] + score
                     nscore = drop_in_slot(ngrid, nscore, l, c)
                     heapq.heappush(h, (nscore, encode(ngrid)))
                 l -= 1
 
+            # right
             while r < COLS:
-                if r == SLOT_FOR_LETTER[v] and grid[1][r] == SPACE and grid[2][r] in (v, SPACE):
+                if grid[0][r] != SPACE:
+                    break
+                elif r == SLOT_FOR_LETTER[v] and grid[1][r] == SPACE and all([grid[x][r] in (v, SPACE) for x in range(2, len(grid))]):
                     ngrid = deepcopy(grid)
                     nscore = abs(c-r) * ENERGY[v] + score
                     nscore = drop_in_slot(ngrid, nscore, r, c)
@@ -180,7 +186,7 @@ def solution2():
 
 
 if __name__ == '__main__':
-    #print(solution1())
+    print(solution1())
     
     print('--------------')
     
