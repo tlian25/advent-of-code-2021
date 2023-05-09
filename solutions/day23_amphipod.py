@@ -173,7 +173,6 @@ def process_row(h, grid, row, score):
 def solution1():
     grid = parse_lines(1)
     ENDSTATE = '...........|##A#B#C#D##|##A#B#C#D##'
-    #ENDSTATE = '...........|##Z#Z#Z#Z##|##Z#Z#Z#Z##'
     score = run(grid, ENDSTATE)
     return score
 
