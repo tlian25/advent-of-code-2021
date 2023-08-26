@@ -101,13 +101,13 @@ def dfs(vals, n, i):
         print(NUM)
         sys.exit()
         
-        
-    
-    
-        
-vals = {W:0, X:0, Y:0, Z:0}
 
-dfs(vals, 9, 0)
+vals = {W:0, X:0, Y:0, Z:0}
+# Attempt 1 - DFS from end
+# dfs(vals, 9, 0)
+
+
+
     
     
 
