@@ -6,10 +6,6 @@ from functools import reduce
 from util.input_util import read_input_file
 
 
-def parse_lines():
-    lines = read_input_file(16)
-    return lines[0]
-
 hex_to_bin_map = {
     "\n" : "",
     "0" : "0000",
@@ -46,7 +42,7 @@ op_map = {
     5 : lambda x : 1 if x[0] > x[1] else 0,
     6 : lambda x : 1 if x[0] < x[1] else 0,
     7 : lambda x : 1 if x[0] == x[1] else 0
-    }
+}
 
 # First three bits encode packet version
 # Next three bits encode packet type ID
@@ -59,109 +55,115 @@ op_map = {
 # Length type ID = 0 -> next 15 bits are a number that represents total length in bits of sub-packets
 # Length type ID = 1 -> next 11 bits are a number that represent number of sub-packets
 
-VERSION_TOTAL = 0
-RESULT = []
 DIGIT = 'DIGIT'
 OPER = 'OPER'
+VERSION_SUM = 0
 
 
-
-def parse_packet(packet) -> list:
+def parse_literal(i, j, packet):
+    # print("Parsing literal: ", i, j, packet[i:j])
+    # literal
+    num = ''
+    while i < j: 
+        indicator = packet[i]
+        # print(packet[i:i+5])
+        num += packet[i+1:i+5]
+        i += 5
+        if indicator == '0':
+            break
     
-    global VERSION_TOTAL
-    global RESULT
-    
-    if packet is None or len(packet) == 0:
-        return None
-    
-    # Header
-    version = int(packet[:3], 2)
-    typeID = int(packet[3:6], 2)
-    print(version, typeID, len(packet))
-    VERSION_TOTAL += version
-    
-    if typeID == 4: # literal
-        packet = parse_literal(packet[6:])
-    else: # operator
-        RESULT.append((OPER, typeID))
-        packet = parse_operator(packet[6:])
-        
-    return packet
-        
-    
+    num = int(num, 2)
+    print("Literal:", num, i)
+    return num, i
 
 
-def parse_literal(packet) -> list:
-    
-    global RESULT
-
-    digit = ""
-    while len(packet) > 4:
-        lead = packet[0]
-        print("Digit", lead, packet[1:5])
-        digit += packet[1:5]
-        packet = packet[5:]
-        
-        if lead == '0': # break
-            digit = int(digit, 2)
-            print("Literal: ", digit)
-            RESULT.append((DIGIT, digit))
-            return packet
-         
+def prod(l):
+    i = 1
+    for n in l:
+        i *= n
+    return i
 
 
+def parse_packet(i, j, packet):
+    global VERSION_SUM
 
-def parse_operator(packet) -> list:
-    length_typeID = packet[0]
-    if length_typeID == '0':
-        subpacket_length = int(packet[1:16], 2)
-        print("Subpacket length: ", subpacket_length)
-        subpacket = packet[16:16+subpacket_length]
-        while subpacket:
-            subpacket = parse_packet(subpacket)
-
-        return packet[16+subpacket_length:]
-        
-        
-    elif length_typeID == '1':
-        subpacket_count = int(packet[1:12], 2)
-        print("Subpacket count: ", subpacket_count)
-        packet = packet[12:]
-        for i in range(subpacket_count):
-            packet = parse_packet(packet)
+    while i < j:
+        curr_version = int(packet[i:i+3], 2)
+        print("Version:", curr_version)
+        VERSION_SUM += curr_version
+        i += 3
+        # read next 3
+        curr_type = int(packet[i:i+3], 2)
+        print("Type:", curr_type)
+        i += 3
             
-        return packet
+        if curr_type == 4:
+            num, i = parse_literal(i, j, packet)
+            return num, i
+            
+        else: 
+            # operator based on type
+            # find length
+            operator = curr_type
+            print("Operator:", curr_type)
+            type_id = int(packet[i])
+            i += 1
+            
+            nums = []
+            if type_id == 0: # next 15 bits are a number that represent total length in bits
+                l = int(packet[i:i+15], 2)
+                i += 15
+                end = i + l
+                while i < end:
+                    num, i = parse_packet(i, end, packet)
+                    nums.append(num)
+                
+            elif type_id == 1: # next 11 bits
+                l = int(packet[i:i+11], 2)
+                i += 11
+                for _ in range(l):
+                    num, i = parse_packet(i, j, packet)
+                    nums.append(num)
+            else:
+                raise ValueError("unknown type: ", type_id)
+                
+            # Operator
+            # print("nums:", nums)
+            if operator == 0:
+                res = sum(nums)
+            elif operator == 1:
+                res = prod(nums)
+            elif operator == 2:
+                res = min(nums)
+            elif operator == 3:
+                res = max(nums)
+            elif operator == 5:
+                res = 1 if nums[0] > nums[1] else 0
+            elif operator == 6:
+                res = 1 if nums[1] > nums[0] else 0
+            elif operator == 7:
+                res = 1 if nums[0] == nums[1] else 0
         
-        
-        
-    
-
-
+            return res, i
 
 
 
 def solution1():
+    global VERSION_SUM
     packet = parse_lines()
-    
-    while packet:
-        packet = parse_packet(packet)
-    
-    print(VERSION_TOTAL)
-    print(RESULT)
+    parse_packet(0, len(packet), packet)
+    return VERSION_SUM
     
 
-
-    
-    
-    
 def solution2():
-    pass
+    packet = parse_lines()
+    return parse_packet(0, len(packet), packet)[0]
     
     
     
 if __name__ == '__main__':
-    print(solution1())
+    print("Packet Version Sum:", solution1())
     
     print('--------------')
     
-    print(solution2())
+    print("Packet Value:", solution2())
